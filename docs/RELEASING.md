@@ -18,6 +18,10 @@ Pushes to `master` build downloadable artifacts without publishing. You can
 also run **Release** manually from the Actions page. Only a tag push creates a GitHub Release.
 Use a new package version for each release.
 
+A tag matching the locked Desktop version (for example `v3.10.2`) is also
+accepted. The CLI package and asset filenames retain their build number
+(for example `3.10.2-22`).
+
 The workflow validates the locked runtime, runs the tests and TUI smoke suite,
 then builds these assets:
 
