@@ -14,8 +14,8 @@ git tag v3.10.2-22
 git push origin v3.10.2-22
 ```
 
-Alternatively, run **Release** from the Actions page to build and download
-artifacts without publishing. Only a tag push creates a GitHub Release.
+Pushes to `master` build downloadable artifacts without publishing. You can
+also run **Release** manually from the Actions page. Only a tag push creates a GitHub Release.
 Use a new package version for each release.
 
 The workflow validates the locked runtime, runs the tests and TUI smoke suite,
