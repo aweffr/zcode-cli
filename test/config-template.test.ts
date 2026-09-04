@@ -1,0 +1,56 @@
+import { expect, test } from "bun:test";
+import { join } from "node:path";
+
+interface TemplateProvider {
+  kind: string;
+  options: {
+    apiKey?: string;
+    baseURL: string;
+  };
+  models: Record<string, unknown>;
+}
+
+interface ConfigTemplate {
+  provider: Record<string, TemplateProvider>;
+  model: {
+    main: string;
+    lite: string;
+  };
+  modelStream: {
+    idleTimeoutMs: number;
+  };
+  subagents: {
+    autoBackgroundMs: number;
+  };
+  ui: {
+    theme: string;
+    copyOnSelect: boolean;
+    notifications: {
+      method: string;
+      condition: string;
+    };
+  };
+}
+
+test("custom-provider config template is internally consistent", async () => {
+  const file = Bun.file(join(import.meta.dir, "..", "config.example.json"));
+  const config = (await file.json()) as ConfigTemplate;
+  const [providerId, modelId] = config.model.main.split("/", 2);
+
+  const [liteProviderId, liteModelId] = config.model.lite.split("/", 2);
+  expect(providerId).toBe("bigmodel");
+  expect(liteProviderId).toBe(providerId);
+  expect(config.provider[providerId]?.kind).toBe("anthropic");
+  expect(config.provider[providerId]?.models[modelId]).toBeDefined();
+  expect(config.provider[providerId]?.models[liteModelId]).toBeDefined();
+  expect(config.provider[providerId]?.options.apiKey).toBeUndefined();
+  expect(config.provider[providerId]?.options.baseURL).toBe("https://open.bigmodel.cn/api/anthropic");
+  expect(config.modelStream.idleTimeoutMs).toBe(60_000);
+  expect(config.subagents.autoBackgroundMs).toBe(1_000);
+  expect(config.ui.theme).toBe("auto");
+  expect(config.ui.copyOnSelect).toBe(true);
+  expect(config.ui.notifications).toEqual({ method: "auto", condition: "unfocused" });
+  // The runtime's user-config model schema is strict: only main/lite are accepted
+  // (model.available is a runtime-internal key injected by the app host, not user config).
+  expect(Object.keys(config.model).sort()).toEqual(["lite", "main"]);
+});
