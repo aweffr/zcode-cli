@@ -45,6 +45,7 @@ jobs:
         with:
           name: release-npm
           path: .release/*.tgz
+          include-hidden-files: true
           if-no-files-found: error
 
   portable:
@@ -81,6 +82,7 @@ jobs:
         with:
           name: release-${{ matrix.target }}
           path: .release/*-${{ matrix.target }}.tar.gz
+          include-hidden-files: true
           if-no-files-found: error
 
   publish:
