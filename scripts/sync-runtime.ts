@@ -12,6 +12,7 @@ import {
   type RuntimeCapabilities,
   type RuntimeCliOptionCapability
 } from "../src/runtime-capabilities.ts";
+import { resolveSessionSystemPrompt } from "../src/session-system-prompt.ts";
 import { parseReleaseVersion, syncedReleaseVersion } from "./release-version.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -406,6 +407,55 @@ export function patchRuntimeCliHelpContract(runtime: string): string {
   let patched = runtime;
   for (const option of legacyHeadlessOptions) {
     if (!supported[option]) patched = patched.replace(cliHelpOptionLine(option), "");
+  }
+  return patched;
+}
+
+/** Persist the main prompt with its session and replace its system messages verbatim. */
+export function patchRuntimeSystemPrompt(runtime: string): string {
+  const marker = "function $zSessionSystemPromptV2(";
+  if (runtime.includes(marker)) return runtime;
+  let patched = runtime;
+  const oldStart = patched.indexOf("build(){const $zCliSystemPrompt=process.env.ZCODE_CLI_SYSTEM_PROMPT;");
+  if (oldStart >= 0) {
+    const oldEnd = patched.indexOf("let t=[],r=this.config.outputStyle?.prompt.trim()?", oldStart);
+    if (oldEnd < 0) throw new Error("Cannot upgrade the previous system prompt patch.");
+    patched = patched.slice(0, oldStart) + "build(){" + patched.slice(oldEnd);
+  }
+  const binding = /runtimeConfig:([A-Za-z_$][\w$]*),untrustedProjectMcpServers:[A-Za-z_$][\w$]*\}=[A-Za-z_$][\w$]*\(\{cliStorageRoot:([A-Za-z_$][\w$]*),configResult:[A-Za-z_$][\w$]*,options:([A-Za-z_$][\w$]*)/u.exec(patched);
+  const app = /return\{sessionId:([A-Za-z_$][\w$]*),traceId:[A-Za-z_$][\w$]*\.traceId,runtime:[A-Za-z_$][\w$]*,respondWorkspaceHookReview:/u.exec(patched);
+  const anchor = "build(){let t=[],r=this.config.outputStyle?.prompt.trim()?";
+  const sectionBuilder = /t\.push\(([A-Za-z_$][\w$]*)\(\{name:"Custom System Prompt",source:"custom_system_prompt"/u.exec(patched)?.[1];
+  const assignmentPattern = /([A-Za-z_$][\w$]*)\.recallPreviousInput=async ([A-Za-z_$][\w$]*)=>await\(await ([A-Za-z_$][\w$]*)\(\)\)\.recallPreviousInputHistory\?\.\(\2\)\?\?null/u;
+  const adapter = assignmentPattern.exec(patched);
+  const optionsPattern = /recallPreviousInput:([A-Za-z_$][\w$]*)\.recallPreviousInput,sendInput:\1\.sendInput/u;
+  if (!binding || !app || !sectionBuilder || !adapter || !optionsPattern.test(patched)
+    || !patched.includes(anchor) || !patched.includes("customSystemPrompt:this.config.systemPrompt,")) {
+    throw new Error("ZCode runtime is incompatible with the session system prompt patch.");
+  }
+  const [, config, storage, options] = binding;
+  const sessionId = app[1];
+  const resolver = resolveSessionSystemPrompt.toString().replace("resolveSessionSystemPrompt", "$zSessionSystemPromptV2");
+  patched = patched.replace(/([A-Za-z_$][\w$]*)\.mark\("ZCode runtime configuration resolved"/u,
+    `${config}.cliSystemPrompt=(${resolver})({sessionId:${sessionId},cliStorageRoot:${storage},resume:${options}.resume,currentSystemPrompt:${config}.systemPrompt,env:${options}.env??process.env}),$1.mark("ZCode runtime configuration resolved"`);
+  patched = patched.replace(app[0], app[0].replace("respondWorkspaceHookReview:", `readSystemPrompt:()=>${config}.cliSystemPrompt??null,respondWorkspaceHookReview:`));
+  patched = patched.replace("customSystemPrompt:this.config.systemPrompt,", "cliSystemPrompt:this.config.cliSystemPrompt,customSystemPrompt:this.config.systemPrompt,");
+  patched = patched.replace(anchor,
+    "build(){const $zCliSystemPrompt=this.config.cliSystemPrompt?.content;"
+    + "if($zCliSystemPrompt!==void 0){"
+    + `const $zCliPromptSection=${sectionBuilder}({name:"Custom System Prompt",source:"custom_system_prompt",`
+    + "injectionTarget:\"system\",cacheHint:\"stable\",content:$zCliSystemPrompt});"
+    + "return{sections:[$zCliPromptSection],totalChars:$zCliPromptSection.chars,totalTokens:$zCliPromptSection.tokens,"
+    + "systemMessages:[{role:\"system\",content:$zCliSystemPrompt}],metaUserAttachments:[]};}"
+    + "let t=[],r=this.config.outputStyle?.prompt.trim()?");
+  const [, bridge, , getApp] = adapter;
+  patched = patched.replace(adapter[0], `${bridge}.readSystemPrompt=async()=>await(await ${getApp}()).readSystemPrompt?.()??null,${adapter[0]}`);
+  patched = patched.replace(optionsPattern, `readSystemPrompt:$1.readSystemPrompt,$&`);
+  if (!patched.includes("  --system-prompt-file <path>")) {
+    patched = patched.replace("  --prompt <text>  Run a single prompt without opening the TUI\n",
+      "  --prompt <text>  Run a single prompt without opening the TUI\n"
+      + "  --system-prompt <text>  Replace the main system prompt completely\n"
+      + "  --system-prompt-file <path>  Read the replacement system prompt from a UTF-8 file\n");
   }
   return patched;
 }
@@ -1255,6 +1305,12 @@ const terminalProjectionMarkers = [
 ] as const;
 
 export const runtimePatchPlan: readonly RuntimePatchDefinition[] = [
+  {
+    id: "custom-system-prompt",
+    requirement: "required",
+    apply: patchRuntimeSystemPrompt,
+    verify: (runtime) => runtime.includes("function $zSessionSystemPromptV2(")
+  },
   {
     id: "desktop-source-title",
     requirement: "required",

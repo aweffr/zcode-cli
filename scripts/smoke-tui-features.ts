@@ -77,6 +77,9 @@ let interactionError: unknown;
 try {
   await waitFor("welcome screen", /ZCode/i);
   await waitFor("restored startup transcript", /Restored startup response\./i);
+  await waitFor("custom prompt startup notice", /Custom system prompt active/i);
+  await waitFor("custom prompt preview", /Preview: Fixture custom system prompt content/i);
+  await waitFor("custom prompt source", /fixture-system-prompt\.txt/i);
   await waitFor("interactive editor", /◈ alpha\/model ─ ◉ build/i);
   await sendAndWait("\x1b", "double-Esc rewind hint", /Esc again to rewind conversation/i);
   await sendAndWait("\x1b", "rewind target picker", /Rewind conversation[\s\S]*Restored later prompt/i);
@@ -409,6 +412,7 @@ try {
   await sendAndWait("/goal pause\r", "paused goal", /Goal: Paused \(\/goal resume\)/i);
   await sendAndWait("/resume\r", "resume picker", /Resume Session/i);
   await sendAndWait("\r", "selected session transcript", /Restored selected response\./i);
+  await waitFor("restored custom prompt notice", /Custom system prompt restored/i);
   terminal.write("\x03");
 } catch (error) {
   interactionError = error;

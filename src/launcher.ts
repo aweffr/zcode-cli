@@ -25,6 +25,7 @@ import {
   runZaiOAuthLogin,
   type OfficialLoginPayload
 } from "./zai-oauth.ts";
+import { resolveSystemPromptArgs } from "./system-prompt.ts";
 import { requestAppServer } from "./app-server-client.ts";
 import { runPluginCommand } from "./plugin-cli.ts";
 import {
@@ -302,6 +303,8 @@ export function firstRunSetupEnv(setupPending: boolean, args: string[]): NodeJS.
 function runtimeEnvironment(extra: NodeJS.ProcessEnv = {}): Record<string, string> {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.ZCODE_CLI_OAUTH_CALLBACK_STDIN;
+  delete env.ZCODE_CLI_SYSTEM_PROMPT;
+  delete env.ZCODE_CLI_SYSTEM_PROMPT_SOURCE;
   const distributionVersion = readDistributionVersion();
   const inherited = applyCliNetworkPolicy({
     ...env,
@@ -480,6 +483,18 @@ export async function main(args: string[]): Promise<number> {
     return 0;
   }
 
+  let systemPrompt: string | undefined;
+  let systemPromptSource: string | undefined;
+  try {
+    const resolved = resolveSystemPromptArgs(args, process.cwd(), readRuntimeCliOptionTypes());
+    args = resolved.args;
+    systemPrompt = resolved.prompt;
+    systemPromptSource = resolved.source;
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
   let setupPending = false;
   try {
     const bootstrap = await ensureUserConfig();
@@ -567,7 +582,11 @@ export async function main(args: string[]): Promise<number> {
 
   try {
     const runtimeArgs = withDefaultBrowserUse(login.args);
-    return await runRuntime(node, runtimeArgs, firstRunSetupEnv(setupPending, runtimeArgs));
+    return await runRuntime(node, runtimeArgs, {
+      ...firstRunSetupEnv(setupPending, runtimeArgs),
+      ...(systemPrompt !== undefined ? { ZCODE_CLI_SYSTEM_PROMPT: systemPrompt } : {}),
+      ...(systemPromptSource ? { ZCODE_CLI_SYSTEM_PROMPT_SOURCE: systemPromptSource } : {})
+    });
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     return 1;

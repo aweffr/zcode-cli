@@ -7,6 +7,7 @@ import {
   BRAND_MARK_WIDTH,
   Divider,
   WelcomeBanner,
+  systemPromptNotice,
   WIDE_BANNER_MIN_WIDTH
 } from "../packages/zcode-tui/src/welcome-banner.ts";
 
@@ -104,4 +105,14 @@ describe("Divider component", () => {
     const divider = new Divider("─", (text) => text);
     expect(divider.render(0)).toEqual([""]);
   });
+});
+
+test("custom prompt notice confirms the source and bounds its preview", () => {
+  const notice = systemPromptNotice({ content: "第一行\n第二行  " + "长".repeat(200), source: "/tmp/custom.txt", resumed: false });
+  expect(notice).toContain("Custom system prompt active");
+  expect(notice).toContain("Source: /tmp/custom.txt");
+  expect(notice).toContain("Preview: 第一行 第二行");
+  expect(Array.from(notice.split("Preview: ")[1]!)).toHaveLength(161);
+  expect(notice.endsWith("…")).toBe(true);
+  expect(systemPromptNotice({ content: "saved prompt", resumed: true })).toContain("Custom system prompt restored");
 });

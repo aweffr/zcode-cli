@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { runTui } from "../../packages/zcode-tui/src/index.ts";
 import type { PromptCallOptions } from "../../packages/zcode-tui/src/types.ts";
 
+let customPromptResumed = false;
+
 if (process.argv[2] === "login") {
   if (!process.argv.includes("--oauth")) {
     console.error("Error: explicit Z.AI login did not force OAuth");
@@ -222,6 +224,7 @@ await runTui({
     { name: "workflows", description: "Manage workflows" },
     { name: "goal", description: "Manage the session goal" }
   ],
+  readSystemPrompt: async () => ({ content: "Fixture custom system prompt content", source: "/tmp/fixture-system-prompt.txt", resumed: customPromptResumed }),
   loadSessionTranscript: async () => sessionTranscript,
   readClipboardImage: async () => ({
     dataUrl: "data:image/png;base64,aGVsbG8=",
@@ -1008,6 +1011,7 @@ await runTui({
       return { response: "Failing login prepared.", model, thoughtLevel: effort };
     }
     if (input === "/resume fixture-session") {
+      customPromptResumed = true;
       return {
         resetSessionProjection: true,
         restoredMessages: [

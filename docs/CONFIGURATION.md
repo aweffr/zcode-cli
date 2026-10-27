@@ -441,3 +441,32 @@ export ZCODE_TUI_NOTIFICATION_METHOD=auto       # auto|osc9|bel|native|off
 export ZCODE_TUI_NOTIFICATION_CONDITION=always  # unfocused|always
 zcode
 ```
+
+## Replacing the system prompt
+
+Use either startup option to replace the main session's system prompt completely:
+
+```bash
+zcode --system-prompt "You are a concise coding assistant."
+zcode --system-prompt-file ./system-prompt.txt
+zcode --system-prompt-file ./system-prompt.txt --prompt "Inspect this project" --json
+```
+
+The options are mutually exclusive. Files are read as UTF-8; relative paths resolve
+from the directory where you run the command, independently of `--cwd`. Whitespace
+is preserved, but empty or whitespace-only prompts are rejected.
+
+The replacement omits the default identity, built-in behavioral instructions,
+AGENTS.md instructions, skill listing and environment/date context from the main
+prompt. Tool definitions remain available. Child agents with their own explicit
+system prompts retain those prompts.
+
+The TUI shows the custom prompt's source and a preview of up to 160 characters
+when a session opens. The full prompt is saved with the session under
+`~/.zcode/cli/system-prompts/` (or the configured CLI storage directory).
+
+`--resume`, `--continue`, and the TUI's `/resume` restore the saved custom prompt,
+even if the original file was changed or deleted. A saved session's prompt takes
+priority over new startup prompt options. New sessions without either option use
+the default prompt. Sessions created before prompt snapshots were introduced are
+not supported by the new resume behavior.

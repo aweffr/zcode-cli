@@ -1,3 +1,4 @@
+import { systemPromptNotice } from "./welcome-banner.ts";
 import { spawn } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { constants as osConstants } from "node:os";
@@ -818,6 +819,7 @@ class ZCodeTui {
         this.addNotice(`Unable to load notification settings: ${notificationConfigError}`, "warning");
       }
       await this.restoreInitialTranscript();
+      await this.showSystemPromptNotice();
       if (this.transcript.blockCount > 0) this.enterSessionRail(true);
       if (updateCheck?.availableVersion && this.distributionVersion) {
         this.addUpdateAvailable(this.distributionVersion, updateCheck.availableVersion);
@@ -2054,6 +2056,7 @@ class ZCodeTui {
       emitSessionTerminalTitle(this.options.stdout ?? process.stdout, "");
       this.sessionMetrics = {};
       this.restoreTranscript(restoredMessages(result.restoredMessages));
+      await this.showSystemPromptNotice();
       if (this.transcript.blockCount > 0) this.enterSessionRail(true);
     }
 
@@ -5140,6 +5143,11 @@ class ZCodeTui {
       this.rememberEditorHistory(input);
       this.editor.addToHistory(input);
     }
+  }
+
+  private async showSystemPromptNotice(): Promise<void> {
+    const prompt = await this.options.readSystemPrompt?.();
+    if (prompt) this.addNotice(systemPromptNotice(prompt), "muted");
   }
 
   private async restoreInitialTranscript(): Promise<void> {

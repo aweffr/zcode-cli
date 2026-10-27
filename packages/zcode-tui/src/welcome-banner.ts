@@ -1,3 +1,4 @@
+import type { SessionSystemPrompt } from "../../../src/session-system-prompt.ts";
 import {
   truncateToWidth,
   visibleWidth,
@@ -160,4 +161,15 @@ export class Divider implements Component {
   }
 
   invalidate(): void {}
+}
+
+export function systemPromptNotice(prompt: SessionSystemPrompt): string {
+  const content = bannerText(prompt.content).replace(/\s+/gu, " ").trim();
+  const characters = Array.from(content);
+  const preview = characters.slice(0, 160).join("") + (characters.length > 160 ? "…" : "");
+  return [
+    prompt.resumed ? "Custom system prompt restored" : "Custom system prompt active",
+    `Source: ${bannerText(prompt.source ?? "command line")}`,
+    `Preview: ${preview}`
+  ].join("\n");
 }

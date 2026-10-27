@@ -1,3 +1,4 @@
+import type { SessionSystemPrompt } from "../../../src/session-system-prompt.ts";
 export type UnknownRecord = Record<string, unknown>;
 
 export interface SlashCommandOption {
@@ -71,6 +72,7 @@ export type ListPluginReferences = () => Promise<unknown>;
 
 /** Stable boundary consumed by the local TUI; upstream details stay in the bridge. */
 export interface RuntimeAdapter {
+  readSystemPrompt?: () => Promise<SessionSystemPrompt | null>;
   loadSessionTranscript?: () => Promise<unknown>;
   loadSessionContextMessages?: () => Promise<unknown>;
   listPluginReferences?: ListPluginReferences;
