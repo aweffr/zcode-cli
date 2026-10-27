@@ -8,6 +8,7 @@ import {
   applyRuntimePatchPlan,
   chooseArtifact,
   extractRuntimeCapabilities,
+  extractLockedRuntime,
   formatRuntimeCompatibilityFailure,
   hasRuntimeCliHelpContract,
   hasRuntimeHttpNoContentGuard,
@@ -55,9 +56,26 @@ describe("runtime synchronization", () => {
       platform: "linux",
       arch: "x64"
     });
-    expect(lock.url).toMatch(/^https:\/\/cdn-zcode\.z\.ai\/.+\.deb$/u);
+    expect(new URL(lock.url).hostname).toBe("github.com");
+    expect(new URL(lock.url).pathname).toContain(`/releases/download/v${lock.appVersion}/`);
     expect(Buffer.from(String(lock.sha512), "base64")).toHaveLength(64);
     expect(packageJson.files).toContain("zcode-runtime.lock.json");
+  });
+
+  test("extracts the runtime from a pinned npm release archive", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "zcode-runtime-archive-"));
+    try {
+      const vendor = join(directory, "package", "vendor");
+      await Bun.write(join(vendor, "zcode.cjs"), "module.exports = { runtime: true };\n");
+      const archive = join(directory, "runtime.tgz");
+      const child = Bun.spawn(["tar", "-czf", archive, "-C", directory, "package"]);
+      expect(await child.exited).toBe(0);
+      const extracted = await extractLockedRuntime(archive, join(directory, "extracted"), "linux");
+      const runtime = await import(join(extracted, "zcode.cjs"));
+      expect(runtime.default).toEqual({ runtime: true });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   test("keeps the CLI build revision while aligning the App version", () => {

@@ -1,7 +1,7 @@
 # Releases
 
 This repository publishes GitHub Releases, not the upstream npm package.
-The official runtime is rebuilt from `zcode-runtime.lock.json`; no scheduled
+The runtime is rebuilt from `zcode-runtime.lock.json`; no scheduled
 upstream update or npm publishing workflow runs here.
 
 ## Publish
@@ -15,7 +15,8 @@ git push origin v3.10.2-22
 ```
 
 Pushes to `master` build downloadable artifacts without publishing. You can
-also run **Release** manually from the Actions page. Only a tag push creates a GitHub Release.
+also run **Release** manually from the Actions page. Only a tag push creates a
+GitHub Release.
 Use a new package version for each release.
 
 A tag matching the locked Desktop version (for example `v3.10.2`) is also
@@ -48,3 +49,8 @@ bun run release:portable
 It signs macOS binaries ad hoc and smoke-tests the extracted archive.
 Outputs are in `.release/`, which is excluded from Git. `release:pack` clears
 that directory, so run it before `release:portable`.
+
+The locked 3.10.2 runtime uses the npm archive from this repository's `v3.10.2`
+release because the original upstream installer URL is no longer available.
+Synchronization extracts its `vendor` directory and reapplies the current patches
+and TUI build. The lock retains the existing artifact checksum verification.

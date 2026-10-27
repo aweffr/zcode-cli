@@ -1489,6 +1489,28 @@ async function getLocalAppVersion(app: string): Promise<string> {
   );
 }
 
+export async function extractLockedRuntime(
+  archive: string,
+  output: string,
+  platform: SyncOptions["platform"]
+): Promise<string> {
+  if (archive.endsWith(".tgz")) {
+    await mkdir(output, { recursive: true });
+    await run("tar", ["-xzf", archive, "-C", output]);
+    const vendor = join(output, "package", "vendor");
+    if (!existsSync(join(vendor, "zcode.cjs"))) {
+      throw new Error("Release package does not contain vendor/zcode.cjs.");
+    }
+    return vendor;
+  }
+  const extracted = await extractWith7Zip(archive, output, platform);
+  const runtime = await findFile(extracted, "zcode.cjs");
+  if (!runtime || basename(dirname(runtime)) !== "glm") {
+    throw new Error("Could not locate resources/glm/zcode.cjs.");
+  }
+  return dirname(runtime);
+}
+
 async function resolveLockedSource(lock: RuntimeLock, temporaryDirectory: string): Promise<RuntimeSource> {
   const archiveName = basename(new URL(lock.url).pathname) || "zcode-installer";
   const archive = join(temporaryDirectory, archiveName);
@@ -1504,14 +1526,10 @@ async function resolveLockedSource(lock: RuntimeLock, temporaryDirectory: string
       + `If the downloaded installer is trusted, update zcode-runtime.lock.json with the actual sha512 above and re-run.`
     );
   }
-  const extracted = await extractWith7Zip(archive, join(temporaryDirectory, "extract"), lock.platform);
-  const runtime = await findFile(extracted, "zcode.cjs");
-  if (!runtime || basename(dirname(runtime)) !== "glm") {
-    throw new Error("Could not locate resources/glm/zcode.cjs.");
-  }
+  const glm = await extractLockedRuntime(archive, join(temporaryDirectory, "extract"), lock.platform);
   return {
     appVersion: lock.appVersion,
-    glm: dirname(runtime),
+    glm,
     lock,
     source: lock.url
   };
